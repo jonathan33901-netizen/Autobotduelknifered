@@ -7,6 +7,33 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
+pcall(function()
+	local hookmetatable = hookmetatable or hookfunction or getrawmetatable
+	if hookmetatable then
+		if getrawmetatable then
+			local grm = getrawmetatable(game)
+			local oldNamecall = grm.__namecall
+			setreadonly(grm, false)
+			grm.__namecall = newcclosure(function(self, ...)
+				local method = getnamecallmethod()
+				if tostring(method):lower() == "kick" then
+					return nil
+				end
+				return oldNamecall(self, ...)
+			end)
+			setreadonly(grm, true)
+		end
+	end
+end)
+
+pcall(function()
+	if LocalPlayer.Kick then
+		LocalPlayer.Kick = function(...)
+			return nil
+		end
+	end
+end)
+
 LocalPlayer.Idled:Connect(function()
 	VirtualUser:CaptureController()
 	VirtualUser:ClickButton2(Vector2.new(0, 0))
@@ -132,9 +159,9 @@ local function scanNextPrompt(myRoot)
 	local closestDistance = SCAN_RADIUS
 	
 	for _, object in pairs(workspace:GetDescendants()) do
-		if object:IsA("ProximityPrompt") and object.Enabled then
+		if object:IsA("ProximityPrompt") and object.Enabled and object.Name == "Moneypc" then
 			local parentPart = object.Parent
-			if parentPart and parentPart:IsA("BasePart") then
+			if parentPart and parentPart:IsA("BasePart") and parentPart.Name == "MoneyPC" then
 				local dist = (myRoot.Position - parentPart.Position).Magnitude
 				if dist <= closestDistance then
 					if not isTargetOccupied(parentPart) then
