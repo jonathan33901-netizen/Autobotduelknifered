@@ -1,0 +1,211 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoFarmToggleGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 220, 0, 70) 
+Frame.AnchorPoint = Vector2.new(0, 1) 
+Frame.Position = UDim2.new(0, 20, 1, -20) 
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = Frame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(255, 60, 60)
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UIStroke.Parent = Frame
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+CloseBtn.Position = UDim2.new(1, -25, 0, 5) 
+CloseBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.fromRGB(150, 150, 160)
+CloseBtn.TextSize = 18
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Parent = Frame
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseBtn
+
+local Label = Instance.new("TextLabel")
+Label.Size = UDim2.new(0.5, 0, 1, 0)
+Label.Position = UDim2.new(0.08, 0, 0, 0)
+Label.BackgroundTransparency = 1
+Label.Text = "AUTO BOT"
+Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+Label.Font = Enum.Font.GothamBold
+Label.TextSize = 14
+Label.TextXAlignment = Enum.TextXAlignment.Left
+Label.Parent = Frame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 55, 0, 26)
+ToggleBtn.Position = UDim2.new(0.65, 0, 0.35, 0) 
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+ToggleBtn.Text = ""
+ToggleBtn.BorderSizePixel = 0
+ToggleBtn.Parent = Frame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(1, 0)
+BtnCorner.Parent = ToggleBtn
+
+local Circle = Instance.new("Frame")
+Circle.Size = UDim2.new(0, 20, 0, 20)
+Circle.Position = UDim2.new(0, 3, 0.5, -10) 
+Circle.BackgroundColor3 = Color3.fromRGB(255, 60, 60) 
+Circle.BorderSizePixel = 0
+Circle.Parent = ToggleBtn
+
+local CircleCorner = Instance.new("UICorner")
+CircleCorner.CornerRadius = UDim.new(1, 0)
+CircleCorner.Parent = Circle
+
+local isToggled = false
+local cooldown = false
+local uiActive = true 
+local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+	local delta = input.Position - dragStart
+	local targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	TweenService:Create(Frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+end
+Frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true; dragStart = input.Position; startPos = Frame.Position
+		input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+	end
+end)
+Frame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
+
+local SHOP_ROOM_RADIUS = 35 
+
+local function isTargetOccupied(targetPart)
+	for _, otherPlayer in pairs(Players:GetPlayers()) do
+		if otherPlayer ~= LocalPlayer and otherPlayer.Character then
+			local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+			if otherRoot then
+				if (otherRoot.Position - targetPart.Position).Magnitude <= 4 then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+local function scanNextPrompt(myRoot)
+	local bestPrompt = nil
+	local closestDistance = math.huge
+	
+	for _, object in pairs(workspace:GetDescendants()) do
+		if object:IsA("ProximityPrompt") and object.Enabled then
+			local parentPart = object.Parent
+			if parentPart and parentPart:IsA("BasePart") then
+				local dist = (myRoot.Position - parentPart.Position).Magnitude
+				if dist <= SHOP_ROOM_RADIUS then
+					if not isTargetOccupied(parentPart) then
+						if dist < closestDistance then
+							closestDistance = dist
+							bestPrompt = {Prompt = object, Part = parentPart}
+						end
+					end
+				end
+			end
+		end
+	end
+	return bestPrompt
+end
+
+local function setToggleState(state)
+	isToggled = state
+	if isToggled then
+		TweenService:Create(Circle, tweenInfo, {Position = UDim2.new(1, -23, 0.5, -10), BackgroundColor3 = Color3.fromRGB(60, 255, 120)}):Play()
+		TweenService:Create(UIStroke, tweenInfo, {Color = Color3.fromRGB(60, 255, 120)}):Play()
+	else
+		TweenService:Create(Circle, tweenInfo, {Position = UDim2.new(0, 3, 0.5, -10), BackgroundColor3 = Color3.fromRGB(255, 60, 60)}):Play()
+		TweenService:Create(UIStroke, tweenInfo, {Color = Color3.fromRGB(255, 60, 60)}):Play()
+	end
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+	if cooldown or not uiActive then return end
+	cooldown = true; setToggleState(not isToggled); task.wait(0.3); cooldown = false
+end)
+
+CloseBtn.MouseEnter:Connect(function() TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 60, 60), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end)
+CloseBtn.MouseLeave:Connect(function() TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(35, 35, 40), TextColor3 = Color3.fromRGB(150, 150, 160)}):Play() end)
+CloseBtn.MouseButton1Click:Connect(function()
+	uiActive = false; isToggled = false 
+	local fadeTween = TweenService:Create(Frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 70), BackgroundTransparency = 1})
+	Label.Visible = false; ToggleBtn.Visible = false; CloseBtn.Visible = false; UIStroke.Enabled = false
+	fadeTween:Play(); fadeTween.Completed:Connect(function() ScreenGui:Destroy() end)
+end)
+
+task.spawn(function()
+	local currentTarget = nil
+	while uiActive do
+		task.wait(0.05)
+		if isToggled and uiActive and LocalPlayer.Character then
+			local character = LocalPlayer.Character
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			local rootPart = character:FindFirstChild("HumanoidRootPart")
+			
+			if humanoid and rootPart then
+				if not currentTarget or not currentTarget.Prompt or not currentTarget.Prompt.Parent or not currentTarget.Prompt.Enabled then
+					currentTarget = scanNextPrompt(rootPart)
+				end
+				
+				if currentTarget then
+					local prompt = currentTarget.Prompt
+					local targetPart = currentTarget.Part
+					local distance = (rootPart.Position - targetPart.Position).Magnitude
+					
+					if distance > (prompt.MaxActivationDistance - 1) then
+						humanoid:MoveTo(targetPart.Position)
+					else
+						humanoid:MoveTo(rootPart.Position) 
+						pcall(function()
+							local targetCameraCFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+							TweenService:Create(Camera, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = targetCameraCFrame}):Play()
+						end)
+						task.wait(0.15)
+						
+						if fireproximityprompt then
+							fireproximityprompt(prompt, 1)
+						else
+							prompt:InputHoldBegin()
+							task.wait(prompt.HoldDuration)
+							prompt:InputHoldEnd()
+						end
+						task.wait(0.05)
+						currentTarget = nil
+					end
+				else
+					humanoid:MoveTo(rootPart.Position)
+					task.wait(0.1)
+				end
+			end
+		end
+	end
+end)
+
