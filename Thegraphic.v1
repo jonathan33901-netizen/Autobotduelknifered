@@ -1,9 +1,16 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
+
+LocalPlayer.Idled:Connect(function()
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new(0, 0))
+end)
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoFarmToggleGui"
@@ -88,16 +95,23 @@ local function update(input)
 	local targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 	TweenService:Create(Frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
 end
+
 Frame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true; dragStart = input.Position; startPos = Frame.Position
 		input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
 	end
 end)
-Frame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+
+Frame.InputChanged:Connect(function(input) 
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then 
+		dragInput = input 
+	end 
+end)
+
 UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
 
-local SHOP_ROOM_RADIUS = 35 
+local SCAN_RADIUS = 50
 
 local function isTargetOccupied(targetPart)
 	for _, otherPlayer in pairs(Players:GetPlayers()) do
@@ -115,19 +129,17 @@ end
 
 local function scanNextPrompt(myRoot)
 	local bestPrompt = nil
-	local closestDistance = math.huge
+	local closestDistance = SCAN_RADIUS
 	
 	for _, object in pairs(workspace:GetDescendants()) do
 		if object:IsA("ProximityPrompt") and object.Enabled then
 			local parentPart = object.Parent
 			if parentPart and parentPart:IsA("BasePart") then
 				local dist = (myRoot.Position - parentPart.Position).Magnitude
-				if dist <= SHOP_ROOM_RADIUS then
+				if dist <= closestDistance then
 					if not isTargetOccupied(parentPart) then
-						if dist < closestDistance then
-							closestDistance = dist
-							bestPrompt = {Prompt = object, Part = parentPart}
-						end
+						closestDistance = dist
+						bestPrompt = {Prompt = object, Part = parentPart}
 					end
 				end
 			end
@@ -208,4 +220,3 @@ task.spawn(function()
 		end
 	end
 end)
-
